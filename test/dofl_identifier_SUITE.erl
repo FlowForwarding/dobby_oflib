@@ -59,13 +59,29 @@ unmock_dobby() ->
     ok = meck:unload(dby).
 
 assert_dobby_search_fun_correct(Dpid, TableNo) ->
-    SearchFun = meck:capture(first, dby, search, ['_', '_', Dpid, '_'],
-                             _ArgNo = 1),
-    NullLink = {Dpid, null, undefined},
+    SearchFun = meck:capture(first, dby, search, 4, _ArgNo = 1),
+    Path = [{Dpid,
+             internal_metadata([{type, of_switch}]),
+             internal_metadata([{type, of_resource}])}],
     SearchResult = SearchFun(?TABLE_IDENTIFIER,
-                             #{type => of_flow_table, table_no => TableNo},
-                             #{type => of_resource},
-                             [NullLink]),
+                             internal_metadata([{type, of_flow_table},
+                                                {table_no, TableNo}]),
+                             Path,
+                             []),
     ?assertEqual({stop, ?TABLE_IDENTIFIER}, SearchResult).
+
+internal_metadata(Proplist) ->
+    Fun = fun({K, V}, AccMap) ->
+                  InnerMap = #{<<"value">> => case is_atom(V) of
+                                                  true ->
+                                                      atom_to_binary(V, utf8);
+                                                  false ->
+                                                      V
+                                              end,
+                               <<"publisher_id">> => <<"ID">>,
+                               <<"timestamp">> => <<"TSTM">>},
+                  maps:put(atom_to_binary(K, utf8), InnerMap, AccMap)
+          end,
+    lists:foldl(Fun, #{}, Proplist).
 
 
