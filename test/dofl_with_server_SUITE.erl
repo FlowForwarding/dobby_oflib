@@ -85,9 +85,9 @@ publish_endpoints() ->
 mk_net_flow_with_flow_path_fun(DstEndpoint) ->
     fun(Identifier, _IdMetadataInfo, [], _) ->
             {continue, [allowed_transitions(init, []), [Identifier]]};
-       (Identifier, IdMetadataInfo, [{_, PrevIdMetadataInfo, _} | _], Acc) ->
+       (Identifier, IdMetadataInfo, [PrevPathElement | _], Acc) ->
             [AllowedT, IdentifiersAcc] = Acc,
-            T = transition(PrevIdMetadataInfo, IdMetadataInfo),
+            T = transition(PrevPathElement, IdMetadataInfo),
             case is_transition_allowed(T, AllowedT) of
                 false ->
                     {skip, Acc};
@@ -99,28 +99,29 @@ mk_net_flow_with_flow_path_fun(DstEndpoint) ->
             end
     end.
 
-transition(PrevIdMetadataInfo, IdMetadataInfo) ->
-    [PrevT, T] =  [begin
-                       TypeMap = maps:get(<<"type">>, MetadataInfo),
-                       maps:get(<<"value">>, TypeMap)
-                   end || MetadataInfo <- [PrevIdMetadataInfo, IdMetadataInfo]],
-    {binary_to_atom(PrevT, utf8), binary_to_atom(T, utf8)}.
+transition({_, #{<<"type">> := PrevIdType}, #{<<"type">> := PrevLinkType}},
+           #{<<"type">> := IdType}) ->
+    Types = [maps:get(value, IdT) || IdT <- [PrevIdType, PrevLinkType, IdType]],
+    list_to_tuple([binary_to_atom(T, utf8) || T <- Types]);
+transition(_, _) ->
+    {undefined, undefined}.
 
 is_transition_allowed(Transition, AllowedTransitions) ->
     lists:member(Transition, AllowedTransitions).
 
-allowed_transitions({endpoint, of_net_flow}, _CurrentAllowedT) ->
-    [{of_net_flow, of_flow_mod},
-     {of_flow_mod, of_flow_mod},
-     {of_flow_mod, of_net_flow}];
-allowed_transitions({of_flow_mod, net_flow}, _CurrentAllowedT) ->
-    [{net_flow, endpoint}];
+allowed_transitions({endpoint, ep_to_nf, of_net_flow}, _CurrentAllowedT) ->
+    [{of_net_flow, of_path_starts_at, of_flow_mod},
+     {of_flow_mod, of_path_forwards_to, of_flow_mod},
+     {of_flow_mod, of_path_ends_at, of_net_flow}];
+allowed_transitions({of_flow_mod, of_path_ends_at, of_net_flow},
+                    _CurrentAllowedT) ->
+    [{of_net_flow, ep_to_nf, endpoint}];
 allowed_transitions(init, _CurrentAllowedT) ->
-    [{endpoint, of_net_flow}];
+    [{endpoint, ep_to_nf, of_net_flow}];
 allowed_transitions(_, CurrentAllowedT) ->
     CurrentAllowedT.
 
 trace_dby_publish() ->
     {module, M} = code:ensure_loaded(M = dby),
     ct:pal("Matched traces: ~p~n",
-           [recon_trace:calls({dby, publish, '_'}, 10, [{pid, all}])]).
+           [recon_trace:calls({dby, publish, '_'}, 20, [{pid, all}])]).
