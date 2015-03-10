@@ -35,6 +35,9 @@ init_per_suite(Config) ->
             Config
     end.
 
+end_per_suite(_Config) ->
+    meck:unload().
+
 all() ->
     [should_publish_net_flow].
 
