@@ -118,12 +118,12 @@ reconstruct_flow_path(FlowPath0) ->
 
 %% This function returns a function to be passed to dby:search.
 vertices_edges_search_fun(Ep1, Ep2) ->
-    fun(Id, #{<<"type">> := <<"endpoint">>}, [], Acc) when Id =:= Ep1 ->
+    fun(Id, #{<<"type">> := #{value := <<"endpoint">>}}, [], Acc) when Id =:= Ep1 ->
             %% This is the starting point.
             {continue, Acc};
        (Id,
-        #{<<"type">> := <<"endpoint">>} = NodeMetadata,
-        [{_, #{<<"type">> := <<"of_port">>}, #{<<"type">> := <<"connected_to">>}} | _] = Path,
+        #{<<"type">> := #{value := <<"endpoint">>}} = NodeMetadata,
+        [{_, #{<<"type">> := #{value := <<"of_port">>}}, #{<<"type">> := #{value := <<"connected_to">>}}} | _] = Path,
         Acc) ->
             %% We've found an endpoint.  That's only interesting if
             %% it's the endpoint we're looking for.
@@ -135,8 +135,8 @@ vertices_edges_search_fun(Ep1, Ep2) ->
                     {skip, Acc}
             end;
        (_Id,
-        #{<<"type">> := Type2},
-        [{_, #{<<"type">> := Type1}, #{<<"type">> := EdgeType}} | _],
+        #{<<"type">> := #{value := Type2}},
+        [{_, #{<<"type">> := #{value := Type1}}, #{<<"type">> := #{value := EdgeType}}} | _],
         Acc) ->
             case valid_edge(Type1, EdgeType, Type2) of
                 true ->
